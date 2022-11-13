@@ -51,7 +51,7 @@ class TCPSYNSegment(TCPSegment):
 
         # tcp header fields
         source = self.source_port   # source port
-        dest = 443   # destination port
+        dest = 3389   # destination port
         seq = 0
         ack_seq = 0
         doff = 5    #4 bit field, size of tcp header, 5 * 4 = 20 bytes

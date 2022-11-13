@@ -4,25 +4,22 @@ from urllib.parse import urlparse
 from tldextract import extract
 
 sys.path.insert(1, os.path.join(os.path.dirname(__file__), 'tls_prober'))
-from tls_prober import prober, probe_db
+# print(os.path.dirname(__file__))
+# print(sys.path)
+from tls_prober import prober
+
 
 # Suppress only the single warning from urllib3 needed.
 requests.packages.urllib3.disable_warnings(category=InsecureRequestWarning)
 
 class FeatureProbe:
 
-    def __init__(self, site, http_port = 80, https_port = 443):
-        if('//' not in site):
-            self.site = 'https://' + site
-        else:
-            self.site = site
+    def __init__(self, ip, rdp_port = 3389):
+        self.ip = ip
 
-        self.http_port = http_port
-        self.https_port = https_port
+        self.rdp_port = rdp_port
 
-        self.fullDomain, self.primaryDomain, self.port, self.path = FeatureProbe.parseURL(self.site)
-
-    @staticmethod
+"""    @staticmethod
     def parseURL(url):
         parts = urlparse(url)
 
@@ -35,7 +32,7 @@ class FeatureProbe:
         tsd, td, tsu = extract(fullDomain)
         primaryDomain = td + '.' + tsu
 
-        return fullDomain, primaryDomain, port, path
+        return fullDomain, primaryDomain, port, path"""
 
 class TLSVersions(FeatureProbe):
 
@@ -63,23 +60,45 @@ class TLSVersions(FeatureProbe):
         context.options |= blackListVersions
 
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # create socket
-        wrappedSocket = context.wrap_socket(s, server_hostname = self.fullDomain, do_handshake_on_connect=True) # wrap socket into TLS context
-        wrappedSocket.settimeout(2)
+        s.connect((self.ip, self.rdp_port))
+        #x224
+        from binascii import  unhexlify
+        x224ConnReqPDU = unhexlify(b"030000130ee000000000000100080008000000")
+        s.send(x224ConnReqPDU)
+        msg = s.recv(1024)
+
+
         try:
-            wrappedSocket.connect((self.fullDomain, 443)) # TLS socket connection
+            wrappedSocket = context.wrap_socket(s, server_hostname=self.ip, do_handshake_on_connect=True) # wrap socket into TLS context
+            wrappedSocket.settimeout(2)
+            #wrappedSocket.connect((self.ip, self.rdp_port)) # TLS socket connection #only tcp connect
+            # #x224
+            # from binascii import  unhexlify
+            # x224ConnReqPDU = unhexlify(b"030000130ee000000000000100080008000000")
+            # wrappedSocket.send(x224ConnReqPDU)
+            # msg = wrappedSocket.recv(1024)
+            #wrappedSocket.do_handshake()
             acceptedVersion = wrappedSocket.version()
+            wrappedSocket.close()
+            print(acceptedVersion)
             return acceptedVersion == version
-        except (ssl.SSLError):
+        except ssl.SSLError as e:
+            print(e)
             return False
-        except (ConnectionResetError, socket.gaierror, Exception):
+        except (ConnectionResetError, socket.gaierror, Exception) as e:
+            print(e)
             return None
         finally:
-            wrappedSocket.close()
+            s.close()
 
 class TLSLibrary(FeatureProbe):
 
-    def test(self):
-        results = prober.probe(self.fullDomain, self.https_port, 'auto', None)
-        matches = probe_db.find_matches(results)
-        results = {key:value for (key,value) in matches}
-        return results
+    def test(self):        
+        # results = prober.quick_probe(self.ip, self.rdp_port, 'auto', db)
+        record_num = prober.probe(self.ip, self.rdp_port, 'auto', None) #prober.py中的probe函数
+        #print(record_num)
+        
+        #results = prober.run_one_probe(self.ip, self.rdp_port, 'auto', NormalHandshake)
+        # matches = probe_db.find_matches(results)
+        # results = {key:value for (key,value) in matches}
+        return {"TLS_recordNum":record_num}

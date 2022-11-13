@@ -1,5 +1,5 @@
 #!/usr/bin/python
-
+from binascii import  unhexlify
 import socket
 import errno
 import logging
@@ -24,7 +24,7 @@ settings = {
     # Note that changing these will invalidate many of the fingerprints
     'default_hello_version': TLSRecord.TLS1_0,
     'default_record_version': TLSRecord.TLS1_0,
-    'socket_timeout': 5
+    'socket_timeout': 10
 }
 
 class Probe(object):
@@ -47,7 +47,13 @@ class Probe(object):
 
         s.settimeout(settings['socket_timeout'])
         s.connect((ipaddress, port))
+        # ##这里加x224交互
 
+        x224ConnReqPDU = unhexlify(b"030000130ee00000000000010008000b000000")
+        s.send(x224ConnReqPDU)
+        msg = s.recv(1024)
+
+        # ##
         # Do starttls if relevant
         starttls(s, port, starttls_mode)
 
@@ -61,24 +67,30 @@ class Probe(object):
 
         response = ''
         got_done = False
+        record_num = 0
 
         while True:
             # Check if there is anything following the server done
             if got_done:
                 # If no data then we're done (the server hasn't sent anything further)
                 # we allow 500ms to give the followup time to arrive
+                #print(record_num)
                 if not select([sock.fileno(),],[],[],0.5)[0]:
                     break
 
             try:
+                record_num += 1
                 record = read_tls_record(sock)
                 response += '*(%x)' % record.version() # TODO: Not sure that recording the record layer version is worth it?
             except socket.timeout as e:
                 response += 'error:timeout'
                 break
             except socket.error as e:
-                # response += 'error:%s|' % errno.errorcode[e.errno]
-                response += 'error:%s' % e
+                try:
+                    response += 'error:%s|' % errno.errorcode[e.errno]
+                # response += 'error:%s' % e
+                except Exception as e:
+                    break
                 break
             except IOError as e:
                 response += 'error:%s|' % str(e)
@@ -120,12 +132,13 @@ class Probe(object):
             if got_done:
                 break
 
-        return response
+        return response,record_num
 
     def probe(self, ipaddress, port, starttls):
+        record_num = 0
         sock = self.connect(ipaddress, port, starttls)
         try:
-            result = self.test(sock)
+            result = self.test(sock) # test用于每个probe构造不同的client hello包。，我保留的probe的test没有返回值，有return的probe也是返回错误信息
         except socket.timeout as e:
             result = 'writeerror:timeout'
             try:
@@ -145,13 +158,13 @@ class Probe(object):
 
         if result:
             return result
-        result = self.process_response(sock)
+        result,record_num = self.process_response(sock)
         try:
             sock.shutdown(socket.SHUT_RD_WR)
         except:
             pass
         sock.close()
-        return result
+        return result,record_num
 
 
 class NormalHandshake(Probe):

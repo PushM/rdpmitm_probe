@@ -1,5 +1,4 @@
-tqdm
 tldextract
-sslyze==2.1.4
+sslyze
 pandas
-scikit-learn==1.0
+#scikit-learn==1.0

@@ -1,65 +1,23 @@
-# PHOCA
-Tool to analyze and classify websites as originating from a MITM phishing toolkit or not. 
-Supplementary material for CCS '21 paper ["Catching Transparent Phish: Analyzing and Detecting MITM Phishing Toolkits"](https://catching-transparent-phish.github.io/catching_transparent_phish.pdf).
+# rdp_mitm detect：
 
-Citation:
+检测RDP中间人。
 
-```
-@article{kondracki2021catching,
-    title={Catching Transparent Phish: Analyzing and Detecting MITM Phishing Toolkits},
-    author={Kondracki, Brian and Azad, Babak Amin and Starov, Oleksii and Nikiforakis, Nick},
-    booktitle={ACM Conference on Computer and Communications Security (CCS)},
-    year={2021}
-}
-```
+首先探测目标RDP服务端RTT和TLS实现特征，基于随机森林分类器判断RDP服务端是不是MITM。
 
-## Requirements
-* python3.7
+```shell
+//需要在linux下运行
+sudo apt-get install python3-venv
 
-## Installation
-Install Python dependencies using `python3.7 -m pip install -r requirements.txt`
+cd rdpmitm_prober
 
-## Usage
-To access low-level network functions to create and send raw TCP packets, this tool requires sudo privilages.
+python3 -m venv rdp-venv
 
-Scan one website by specifying the domain or URL of the site:
+source rdp-venv/bin/activate
 
-`sudo ./phoca www.google.com`
+pip install -r requirements.txt
 
-Bulk scan multiple websites by supplying a csv containing one URL or domain per line:
-
-`sudo ./phoca -r domains.csv`
-
-Output results to a CSV file rather than terminal output:
-
-`sudo ./phoca -r domains.csv -w results.csv`
-
-JSON and CSV formats supported for output of raw feature data:
-
-```
-sudo ./phoca --raw-data --output-format json www.google.com | jq
-{
-  "www.google.com": {
-    "classification": "Non-Phishing",
-    "data": {
-      "site": "www.google.com",
-      "tcpSYNTiming": 5.626678466796875e-05,
-      "tlsClientHelloTiming": 0.0029659271240234375,
-      "tlsClientHelloErrorTiming": 0.003025054931640625,
-      "tlsHandshakeTiming": 0.012071371078491211,
-      ...
+sudo rdp-venv/bin/python3 rdpmitm_prober.py rdp_ip
+//rdp_ip为待测rdp服务端ip
 ```
 
-## Docker
-Alternatively, you can use the supplied Docker image to run PHOCA from a Docker container, simplifying the setup process.
-To do this, first build the image:
-
-`sudo docker build -t phoca .`
-
-Then, run the container, supplying the domain of interest:
-
-`sudo docker run --rm phoca www.attacker.com`
-
-If you would like to allow PHOCA to read domains from an input file, you must mount that file to the root of the container:
-
-`sudo docker run -v /home/user/input.txt:/input.txt phoca -r input.txt`
+data文件夹中为分类器训练代码和数据。

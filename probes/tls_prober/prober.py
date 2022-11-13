@@ -4,7 +4,7 @@ import sys, asyncio
 import logging
 import os.path
 from concurrent.futures import ThreadPoolExecutor
-
+from operator import itemgetter
 from optparse import OptionParser
 
 # Ensure we can see the pytls/tls subdir for the pytls submodule
@@ -21,13 +21,14 @@ __email__ = 'rich@kde.org'
 
 # List all the probes we have
 probes = [
-    NormalHandshake(),
-    NormalHandshakePFS(),
-    NormalHandshake11(),
-    NormalHandshake11PFS(),
+    # NormalHandshake(),
+    # NormalHandshakePFS(),
+    # NormalHandshake11(),
+    # NormalHandshake11PFS(),
     NormalHandshake12(),
-    NormalHandshake12PFS(),
-    NormalHandshake12PFSw13(),
+    # NormalHandshake12PFS(),
+    # NormalHandshake12PFSw13(),
+    '''
     ChangeCipherSpec(),
     ChangeCipherSpec12(),
     ChangeCipherSpec12PFS(),
@@ -316,18 +317,22 @@ probes = [
     TACKNotNull(),
     TACKNotNull12(),
     TACKNotNull12PFS()
+    '''
 ]
 
-results = {}
+results = None
 def do_probe(args):
     probe, ipaddress, port, starttls = args
     # logging.info('Probing... %s', type(probe).__name__)
     # print(type(probe).__name__)
     try:
-        result = probe.probe(ipaddress, port, starttls)
+        result,record_num = probe.probe(ipaddress, port, starttls)
+        #print(result)
+        #print(record_num)
     except Exception as e:
         result = None
-    results[type(probe).__name__] = result
+        record_num = None
+    return record_num
     # return (type(probe).__name__, result)
 
 def probe(ipaddress, port, starttls, specified_probe):
@@ -343,17 +348,99 @@ def probe(ipaddress, port, starttls, specified_probe):
     #     results[type(probe).__name__] = result
     #     print('%s: %.5f' % (type(probe).__name__, time.time() - startTime))
 
-    local_probes = [(probe, ipaddress, port, starttls) for probe in probes]
-    with ThreadPoolExecutor(max_workers=50) as executor:
-        executor.map(do_probe, local_probes)
+    #local_probes = [(probe, ipaddress, port, starttls) for probe in probes]#probes指定要发送的client hello
+    
+    local_probes = (NormalHandshake12(), ipaddress, port, starttls) 
+    # with ThreadPoolExecutor(max_workers=50) as executor:
+    #     executor.map(do_probe, local_probes)
+    record_num = do_probe(local_probes)
 
     # resultList = await asyncio.gather(*[do_probe(probe, ipaddress, port, starttls) for probe in probes])
     # results = {}
     # for result in resultList:
     #     print(result)
     #     results[result[0]] = result[1]
-    return results
+    return record_num
 
+def run_one_probe(ipaddress, port, starttls, specified_probe):
+    for probe in probes:
+        if specified_probe != type(probe).__name__:
+            continue
+
+        logging.info('Probing... %s', type(probe).__name__)
+        return {type(probe).__name__: probe.probe(ipaddress, port, starttls)}
+def probe_strength(db, raw_scores):
+    # return how diverse are the expected results of probes in the
+    # provided database (which probe is most likely to provide
+    # unique fingerprint)
+    if raw_scores:
+        max_score = max(raw_scores.items(), key=itemgetter(1))
+    else:
+        max_score = (None, 0)
+
+    # fingerprints that have the same, best, score
+    tied_fingerprints = set(name for name, val in raw_scores.items()
+                            if val == max_score[1])
+    probe_matches = {}
+    probe_presence = {}
+    for fingerprint in db:
+        for probe_name, probe_result in fingerprint.probes.items():
+            probe_matches.setdefault(probe_name, set()).add(probe_result)
+            if probe_name not in probe_presence:
+                probe_presence[probe_name] = 0
+            if fingerprint.metadata['Description'] in tied_fingerprints:
+                probe_presence[probe_name] += 2
+            else:
+                probe_presence[probe_name] += 1
+
+    max_len = max(len(val) for val in probe_matches.values())
+    max_hits = max(probe_presence.values())
+
+    return dict((name, len(val) / max_len * probe_presence.get(name, 0) / max_hits)
+                for name, val in probe_matches.items())
+
+def quick_probe(ipaddress, port, starttls, db):
+    # try to as quickly as possible reach 10 matching probes
+    results = {}
+    raw_scores = {}
+    best_score = 0
+    filtered_db = list(db)
+
+    while True:
+        # get list of probes that are most likely to provide unique
+        # response from server
+        scored_probes = probe_strength(filtered_db, raw_scores)
+        probes_iter = (name for name, _ in
+                       sorted(scored_probes.items(), key=itemgetter(1),
+                              reverse=True)
+                       if name not in results)
+        # run probes against target until we get at least one match
+        #print([i for i in probes_iter])
+        for best_probe in probes_iter:
+            print(best_probe)
+            r = run_one_probe(ipaddress, port, starttls, best_probe)
+            print(r)
+            try :
+                results.update(r)
+            #results.update(run_one_probe(ipaddress, port, starttls, best_probe))
+            except TypeError as e:
+                print(r)
+                raise e
+            raw_scores = probe_db.find_raw_matches(db, results)
+            if raw_scores:
+                break
+        else:
+            break
+        # repeat until the best match has more than 10 matching probes
+        best_score = max(raw_scores.items(), key=itemgetter(1))
+        if best_score[1] >= 10:
+            break
+        # in next iteration look for best probes given the already matching
+        # libraries (to try breaking ties)
+        filtered_db = [fp for fp in db
+                       if fp.description() in raw_scores]
+
+    return results
 def list_probes():
     for probe in probes:
         if type(probe).__doc__ is None:

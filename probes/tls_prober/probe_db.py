@@ -69,6 +69,16 @@ def find_matches(probes):
 
     return results
 
+def find_raw_matches(database, probes):
+    scores = {}
+
+    for f in database:
+        for key, probe_result in probes.items():
+            if key in f.probes and f.probes[key] == probe_result:
+                scores[f.description()] = scores.get(f.description(), 0)+1
+
+    return scores
+
 def add_fingerprint(description, probes):
     # Create filename
     filename = description.translate(None, string.punctuation)
