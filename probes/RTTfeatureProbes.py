@@ -180,7 +180,7 @@ class TimingProbe:
             return -1
         return min(results)
 
-    def rdp_connect(self, rawSocket=False, sec_grade=1 , sslSocket=False, n=10, timeout=10):
+    def rdp_connect(self, rawSocket=False, sec_grade=1 , sslSocket=False, n=3, timeout=10):
         conrtt_results = []
         x224rtt_results = []
         MCSrtt_results = []
@@ -224,13 +224,15 @@ class TimingProbe:
             try:
                 self.socket = context.wrap_socket(s, server_hostname = self.rdp_ip, do_handshake_on_connect=False) # wrap socket into TLS context
                 self.socket.do_handshake()
-                NTLMPDU = unhexlify(b"3037a003020106a130302e302ca02a04284e544c4d5353500001000000b78208e2000000000000000000000000000000000a00614a0000000f")#MCSConnInitPDU
-                #MCSConnInitPDU = unhexlify(b"030001ce02f0807f658201c20401010401010101ff30190201220201020201000201010201000201010202ffff020102301902010102010102010102010102010002010102020420020102301c0202ffff0202fc170202ffff0201010201000201010202ffff02010204820161000500147c00018158000800100001c00044756361814a01c0ea000d0008007e070a0301ca03aa04080000614a00004400450053004b0054004f0050002d004900370041004800540047004300000004000000000000000c0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001ca01000000000018000f00af07660038006400350033006300650032002d0032006600660034002d0034003200650066002d0039006500300064002d006500350061003200390035006600000007000800000000000000000000000000000000000000000004c00c00150000000000000002c00c001b0000000000000003c0380004000000726470647200000000008080726470736e640000000000c0636c6970726472000000a0c0647264796e766300000080c006c00800000000000ac0080005030000")
-                MCSConnInitPDU = build_mcs_initial()
+                PDU =None
+                if sec_grade == 1: #MCSConnInitPDU
+                    PDU = build_mcs_initial()
+                else :#ntlm
+                    PDU = unhexlify(b"3037a003020106a130302e302ca02a04284e544c4d5353500001000000b78208e2000000000000000000000000000000000a00614a0000000f")#
                 startTime = time.time()            
-                self.socket.send(NTLMPDU)
-                MCSmsg = self.socket.recv(4096) 
-                #print(MCSmsg)       
+                self.socket.send(PDU)
+                msg = self.socket.recv(4096) 
+                #print(msg)       
                 MCSrtt = time.time() - startTime
                 MCSrtt_results.append(MCSrtt)
             except (TimeoutError, ConnectionResetError, socket.gaierror, socket.timeout, ConnectionRefusedError, OSError) as e:
@@ -246,7 +248,9 @@ class TimingProbe:
         conrtt_results = [result for result in conrtt_results if result != None]
         x224rtt_results = [result for result in x224rtt_results if result != None]
         MCSrtt_results = [result for result in MCSrtt_results if result != None]
-
+        # print(conrtt_results)
+        # print(x224rtt_results)
+        # print(MCSrtt_results)
         if(len(conrtt_results) == 0 or len(x224rtt_results) == 0 or len(MCSrtt_results) == 0):
             return -1
 
@@ -273,13 +277,13 @@ class tcpSYNTiming(TimingProbe):
 
 class RdpConnectTiming_SSL(TimingProbe):
 
-    def test(self,n=3):
+    def test(self,n=2):
         x224ConnReqPDU = unhexlify(b"030000130ee000000000000100080001000000")
         return super().rdp_connect(sec_grade=1, sslSocket=True, n=n)
 
 class RdpConnectTiming_Cred(TimingProbe):
 
-    def test(self,n=3):
+    def test(self,n=2):
         x224ConnReqPDU = unhexlify(b"030000130ee000000000000100080001000000")
         return super().rdp_connect(sec_grade=2, sslSocket=True, n=n)
 

@@ -23,7 +23,7 @@ class Detector:
         #tcpSYNTiming,
         #tlsHandshakeTiming
         RdpConnectTiming_SSL,
-        RdpConnectTiming_Cred
+        #RdpConnectTiming_Cred
     ]
 
     TLSfeatureProbes = [
@@ -33,7 +33,7 @@ class Detector:
 
     def __init__(self, rdp_port=3389, numIterations=3,
                 modelFile="./rdpmitm_rfc.pickle", rawData=True,
-                outputFile=None, outputFormat="json"):
+                outputFile=None, outputFormat="csv"):
 
         self.rdp_port = rdp_port
         self.numIterations = numIterations
@@ -47,7 +47,7 @@ class Detector:
         crawlResults = {}
         result = {}
         for ip in ips :
-            print("probing: {}".format(ip))
+            #print("probing: {}".format(ip))
             try:
                 # 检测目标ip
                 result = self.testSite(ip)
@@ -59,7 +59,7 @@ class Detector:
            # print(f"{result['ip']}: {result['data']}")
             crawlResults[result['ip']] = {'data' : result['data']}
             #if(self.outputFile == None and not self.rawData):
-            #print(f"{result['ip']}: {result['data']}")
+            print(f"{result['ip']}: {result['data']}")
 
         output = self.writeResultsToFile(crawlResults)
         if(output and self.rawData):
@@ -117,7 +117,7 @@ class Detector:
 
     def writeResultsToFile(self, siteResults):
         if(self.outputFile != None):
-            f = open(self.outputFile, 'w')
+            f = open(self.outputFile, 'a')
         else:
             f = io.StringIO()
 
@@ -129,12 +129,12 @@ class Detector:
                 if(self.rawData):
                     currentResults.update(value['data'])#value['data'] 是一个字典 ，字典update字典
                 #currentResults['classification'] = value['classification']
-                currentResults['site'] = key
+                currentResults['ip'] = key
 
                 resultsToFile.append(currentResults)
 
             writer = csv.DictWriter(f, fieldnames=resultsToFile[0].keys())
-            writer.writeheader()
+            #writer.writeheader()
             for row in resultsToFile:
                 writer.writerow(row)
         elif(self.outputFormat == 'json'):
@@ -163,7 +163,7 @@ def process_args():
                         help="ip to classify as a RDP MITM . Not required if input file specified with -r argument.")
     parser.add_argument("-R", "--raw-data",
                         action="store_true",
-                        default=False,
+                        default=True,
                         help="Record and output raw classification data about site(s).")
     parser.add_argument("-w", "--output-file",
                         type=str,
