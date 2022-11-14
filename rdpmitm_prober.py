@@ -1,4 +1,4 @@
-import argparse, sys, os, time, concurrent.futures, csv, io, json
+import argparse, sys, os, time, concurrent.futures, csv, io, json, socket
 import pickle
 #from sklearn.ensemble import RandomForestClassifier
 from pandas import DataFrame, read_csv, concat
@@ -33,7 +33,7 @@ class Detector:
 
     def __init__(self, rdp_port=3389, numIterations=3,
                 modelFile="./rdpmitm_rfc.pickle", rawData=True,
-                outputFile=None, outputFormat="csv"):
+                outputFile=None, outputFormat="csv",source_ip = None):
 
         self.rdp_port = rdp_port
         self.numIterations = numIterations
@@ -41,12 +41,17 @@ class Detector:
         self.outputFile = outputFile
         self.outputFormat = outputFormat
         self.rawData = rawData
+        self.source_ip = source_ip
 #        self.model = pickle.load(open(self.modelFile, 'rb'))
+
 
     def crawl(self, ips):
         crawlResults = {}
         result = {}
+
         for ip in ips :
+            if ip == source_ip:
+                continue
             #print("probing: {}".format(ip))
             try:
                 # 检测目标ip
@@ -187,6 +192,18 @@ def process_args():
     # 不用raw socket了，有点bug
     return args
 
+def test_source_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('10.255.255.255', 1))
+        source_ip, source_port = s.getsockname()
+        #self.dest_port = self.https_port
+        return source_ip
+    except Exception as e:
+        return -1
+    finally:
+        s.close()
+
 if(__name__ == '__main__'):
     args = process_args()
 
@@ -196,8 +213,11 @@ if(__name__ == '__main__'):
     else:
         ips = [args["ip"]]
 
+    source_ip = test_source_ip()
+    #print(source_ip)
     detector = Detector( rawData=args['raw_data'],
                         outputFile=args['output_file'],
-                        outputFormat=args['output_format'])
+                        outputFormat=args['output_format'],
+                        source_ip = source_ip)
 
     detector.crawl(ips)
