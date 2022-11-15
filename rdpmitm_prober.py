@@ -23,7 +23,7 @@ class Detector:
         #tcpSYNTiming,
         #tlsHandshakeTiming
         RdpConnectTiming_SSL,
-        #RdpConnectTiming_Cred
+        RdpConnectTiming_Cred
     ]
 
     TLSfeatureProbes = [
@@ -219,5 +219,12 @@ if(__name__ == '__main__'):
                         outputFile=args['output_file'],
                         outputFormat=args['output_format'],
                         source_ip = source_ip)
-    random_ips = random.shuffle(ips)
+    #打乱ips，防止rdp server高并发
+    index = [i for i in range(len(ips))] 
+    random.shuffle(index)
+    #print(index)
+    random_ips =[]
+    for i in range(len(ips)):
+        random_ips.append(ips[index[i]])
+    
     detector.crawl(random_ips)
