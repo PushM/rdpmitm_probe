@@ -88,7 +88,7 @@ class TimingProbe:
         letters = string.ascii_lowercase
         return ''.join(random.choice(letters) for i in range(stringLength))
 
-    def test(self, payload, rawSocket=False, sslSocket=False, n=10, timeout=2):
+    def test(self, payload, rawSocket=False, sslSocket=False, n=10, timeout=4):
         results = []
 
         for i in range(0, n):
@@ -251,10 +251,15 @@ class TimingProbe:
         # print(conrtt_results)
         # print(x224rtt_results)
         # print(MCSrtt_results)
-        if(len(conrtt_results) == 0 or len(x224rtt_results) == 0 or len(MCSrtt_results) == 0):
-            return -1
+        min_conrtt = -1; min_x244rtt = -1; min_mcsrtt = -1
+        if len(conrtt_results) != 0 :
+            min_conrtt = min(conrtt_results)
+        if len(x224rtt_results) != 0 :
+            min_x244rtt = min(x224rtt_results)
+        if len(MCSrtt_results) != 0 :
+            min_mcsrtt = min(MCSrtt_results)        
 
-        return [min(conrtt_results), min(x224rtt_results), min(MCSrtt_results)]
+        return [min_conrtt, min_x244rtt, min_mcsrtt]
 
 class tcpSYNTiming(TimingProbe):
 
