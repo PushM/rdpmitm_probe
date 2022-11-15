@@ -1,4 +1,4 @@
-import argparse, sys, os, time, concurrent.futures, csv, io, json, socket
+import argparse, sys, os, time, concurrent.futures, csv, io, json, socket, random
 import pickle
 #from sklearn.ensemble import RandomForestClassifier
 from pandas import DataFrame, read_csv, concat
@@ -219,5 +219,5 @@ if(__name__ == '__main__'):
                         outputFile=args['output_file'],
                         outputFormat=args['output_format'],
                         source_ip = source_ip)
-
-    detector.crawl(ips)
+    random_ips = random.shuffle(ips)
+    detector.crawl(random_ips)
